@@ -25,5 +25,5 @@ build() {
 
 package() {
     cd "$srcdir"
-    install -Dm755 "target/release/palthief" "$pkgdir/usr/bin/palthief"
+    install -Dm755 "target/release/palettethief" "$pkgdir/usr/bin/palthief"
 }
