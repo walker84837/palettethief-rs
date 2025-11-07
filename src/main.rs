@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use color_thief::{Algorithm, Color, ColorFormat};
 use image::{ImageBuffer, Rgb};
 use log::info;
@@ -31,6 +31,12 @@ enum AppError {
     ImageSaveError,
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+enum AlgorithmArgs {
+    Kmeans,
+    Mmcq,
+}
+
 #[derive(Parser)]
 struct Args {
     #[clap(help = "Path to the image from where to extract the color palette")]
@@ -51,6 +57,14 @@ struct Args {
         help = "Maximum colors of the palette (2..255)"
     )]
     max_colors: u8,
+
+    #[clap(
+        short,
+        long,
+        default_value = "mmcq",
+        help = "Algorithm to use for color extraction"
+    )]
+    algorithm: AlgorithmArgs,
 
     #[clap(short, long, help = "Enable verbose mode (logging)")]
     verbose: bool,
@@ -87,22 +101,26 @@ fn validate_args(args: &Args) -> Result<()> {
     Ok(())
 }
 
-fn extract_palette(image_path: &Path, quality: u8, max_colors: u8) -> Result<Vec<Color>> {
+fn extract_palette(
+    image_path: &Path,
+    quality: u8,
+    max_colors: u8,
+    algorithm: AlgorithmArgs,
+) -> Result<Vec<Color>> {
     info!("Extracting palette from {:?}", &image_path);
 
     let img =
         image::open(image_path).map_err(|_| AppError::ImageOpenError(image_path.to_path_buf()))?;
     let rgb_img = img.to_rgb8();
 
-    let palette = color_thief::get_palette(
-        // TODO: make this configurable in the future
-        Algorithm::KMeans,
-        &rgb_img,
-        ColorFormat::Rgb,
-        quality,
-        max_colors,
-    )
-    .map_err(|_| AppError::PaletteExtractionError)?;
+    let algorithm = match algorithm {
+        AlgorithmArgs::Kmeans => Algorithm::KMeans,
+        AlgorithmArgs::Mmcq => Algorithm::Mmcq,
+    };
+
+    let palette =
+        color_thief::get_palette(algorithm, &rgb_img, ColorFormat::Rgb, quality, max_colors)
+            .map_err(|_| AppError::PaletteExtractionError)?;
 
     info!("Successfully extracted color palette");
     Ok(palette)
@@ -146,7 +164,12 @@ fn main() -> Result<()> {
 
     validate_args(&args)?;
 
-    let palette = extract_palette(&args.image_path, args.quality, args.max_colors)?;
+    let palette = extract_palette(
+        &args.image_path,
+        args.quality,
+        args.max_colors,
+        args.algorithm,
+    )?;
 
     for (i, color) in palette.iter().enumerate() {
         let color_str = if args.rgb {
