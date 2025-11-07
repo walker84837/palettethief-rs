@@ -1,5 +1,5 @@
 use clap::Parser;
-use color_thief::{Color, ColorFormat as ThiefFormat};
+use color_thief::{Algorithm, Color, ColorFormat};
 use image::{ImageBuffer, Rgb};
 use log::info;
 use miette::{Diagnostic, IntoDiagnostic, Result};
@@ -94,8 +94,15 @@ fn extract_palette(image_path: &Path, quality: u8, max_colors: u8) -> Result<Vec
         image::open(image_path).map_err(|_| AppError::ImageOpenError(image_path.to_path_buf()))?;
     let rgb_img = img.to_rgb8();
 
-    let palette = color_thief::get_palette(&rgb_img, ThiefFormat::Rgb, quality, max_colors)
-        .map_err(|_| AppError::PaletteExtractionError)?;
+    let palette = color_thief::get_palette(
+        // TODO: make this configurable in the future
+        Algorithm::KMeans,
+        &rgb_img,
+        ColorFormat::Rgb,
+        quality,
+        max_colors,
+    )
+    .map_err(|_| AppError::PaletteExtractionError)?;
 
     info!("Successfully extracted color palette");
     Ok(palette)
