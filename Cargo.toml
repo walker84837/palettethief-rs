@@ -1,7 +1,7 @@
 [package]
 name = "palettethief"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0 OR MIT"
 categories = ["command-line-utilities"]
 keywords = ["cli", "command-line"]
@@ -19,7 +19,7 @@ panic = "abort"
 
 [dependencies]
 clap = { version = "4.5.13", features = ["derive"] }
-color-thief = "0.2.2"
+color-thief = { git = "https://github.com/walker84837/color-thief" }
 image = "0.25.2"
 log = "0.4.22"
 miette = { version = "7.2.0", features = ["fancy"] }
