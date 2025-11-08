@@ -118,8 +118,7 @@ To get started:
 
 ## License
 
-This project is dual-licensed under the [MIT License](LICENSE_MIT.md) or the
-[Apache v2 License](LICENSE_APACHE.md).
+This project is licensed under the [EUPL v1.2](LICENSE) license.
 
 ## Project Status
 
