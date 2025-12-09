@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+  - Allow specifying the algorithm to use for color extraction.
+
 ## [0.1.0] - 2024-08-03
 
 ### Added
