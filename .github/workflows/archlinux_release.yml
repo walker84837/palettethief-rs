@@ -1,0 +1,113 @@
+name: Arch Linux Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    container:
+      image: archlinux/archlinux:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare PKGBUILD & source tarball
+        run: |
+          # set version/pkgrel
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.get_version.outputs.VERSION }}/" archlinux/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" archlinux/PKGBUILD
+
+          # create a repo tarball inside archlinux/ so makepkg can find it
+          # exclude build artifacts to keep the tarball small
+          TARFILE=archlinux/palettethief-src.tar.gz
+          echo "Creating tarball $TARFILE from $GITHUB_WORKSPACE (this may include most files)"
+          tar --exclude='./target' --exclude='./.git' -C "$GITHUB_WORKSPACE" -czf "$GITHUB_WORKSPACE/$TARFILE" .
+
+          # update PKGBUILD to use the tarball as the source
+          sed -i 's|^source=.*|source=("palettethief-src.tar.gz")|' archlinux/PKGBUILD
+
+          # sanity output
+          echo "PKGBUILD now:"
+          grep -n '^pkgver\|^pkgrel\|^source' archlinux/PKGBUILD || true
+          ls -lh archlinux/palettethief-src.tar.gz || true
+          cat archlinux/PKGBUILD
+
+      - name: Install system dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            base-devel \
+            git \
+            sudo \
+            rust \
+            cargo \
+            archlinux-keyring
+
+      - name: Create build user
+        run: |
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - name: Fix permissions
+        run: |
+          chown -R builder:builder .
+
+      - name: Build package
+        working-directory: archlinux
+        run: |
+          sudo -u builder makepkg --cleanbuild --syncdeps --noconfirm
+
+      - name: Find generated package(s)
+        id: find_package
+        working-directory: archlinux
+        run: |
+          set -e
+
+          PACKAGES=( *.pkg.tar.zst )
+
+          if [ ${#PACKAGES[@]} -eq 0 ]; then
+            echo "No package files found" >&2
+            exit 1
+          fi
+
+          echo "PACKAGE_FILES<<EOF" >> "$GITHUB_OUTPUT"
+          for p in "${PACKAGES[@]}"; do
+            echo "archlinux/$p" >> "$GITHUB_OUTPUT"
+          done
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          MAIN=""
+          for p in "${PACKAGES[@]}"; do
+            case "$p" in
+              *-debug-*) continue ;;
+              *) MAIN="$p"; break ;;
+            esac
+          done
+          [ -z "$MAIN" ] && MAIN="${PACKAGES[0]}"
+
+          echo "PACKAGE_FILE=archlinux/$MAIN" >> "$GITHUB_OUTPUT"
+
+          echo "Found packages:"
+          printf ' - %s\n' "${PACKAGES[@]}"
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            ${{ steps.find_package.outputs.PACKAGE_FILES }}
